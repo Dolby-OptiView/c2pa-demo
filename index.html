@@ -616,6 +616,8 @@
                 const playerConfig = { libraryLocation };
                 if ($('license').value.trim() !== '') {
                     playerConfig.license = $('license').value.trim();
+                } else {
+                    playerConfig.licenseUrl = './license.txt';
                 }
                 state.player = new THEOplayer.Player($('player'), playerConfig);
                 window.player = state.player;
