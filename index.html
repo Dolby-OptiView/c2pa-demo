@@ -242,9 +242,8 @@
             <h1>C2PA content provenance — metadata &amp; validation demo</h1>
             <p>
                 The OptiView Player exposes the raw C2PA metadata of a signed stream through <code>c2pametadata</code> events (source flag
-                <code>c2paMetadata: true</code>). This page captures the segment bytes with the network API and validates them with
-                <strong>c2patool</strong> (the C2PA reference implementation) in the local Node server. The player itself never validates
-                anything.
+                <code>c2paMetadata: true</code>). This page captures the segment bytes with the network API and validates them in the
+                browser with <strong>C2PA Web</strong>. The player itself never validates anything.
             </p>
         </header>
         <main>
@@ -273,7 +272,7 @@
             </section>
 
             <section>
-                <h2>Validation result (c2patool)</h2>
+                <h2>Validation result (C2PA Web)</h2>
                 <div><span id="result-state" class="badge pending">no validation yet</span></div>
                 <table style="margin-top: 10px">
                     <tr>
@@ -301,7 +300,7 @@
                         <td id="r-input" class="mono">–</td>
                     </tr>
                     <tr>
-                        <th>c2patool time</th>
+                        <th>Validation time</th>
                         <td id="r-time" class="mono">–</td>
                     </tr>
                 </table>
@@ -319,7 +318,7 @@
                     </table>
                 </div>
                 <details style="margin-top: 10px">
-                    <summary>Raw c2patool report</summary>
+                    <summary>Raw C2PA manifest store</summary>
                     <pre id="raw">–</pre>
                 </details>
             </section>
@@ -375,11 +374,14 @@
             </section>
         </main>
 
-        <script>
+        <script type="module">
+            import { Reader, createC2pa } from 'https://unpkg.com/@contentauth/c2pa-web@0.15.0/dist/inline.js?module';
+
             const libraryLocation = 'https://cdn.theoplayer.com/dash/theoplayer/';
             const $ = (id) => document.getElementById(id);
             const state = {
                 player: undefined,
+                c2pa: undefined,
                 events: [],
                 // Initialization segments keyed by "track key" (URL directory), media segments in arrival order.
                 inits: new Map(),
@@ -389,15 +391,6 @@
 
             function trackKeyOf(url) {
                 return url.replace(/\?.*$/, '').replace(/\/[^/]*$/, '/');
-            }
-
-            function toBase64(buffer) {
-                const view = new Uint8Array(buffer);
-                let binary = '';
-                for (let i = 0; i < view.length; i += 0x8000) {
-                    binary += String.fromCharCode.apply(null, view.subarray(i, i + 0x8000));
-                }
-                return btoa(binary);
             }
 
             function hexPreview(data, count = 16) {
@@ -438,20 +431,42 @@
             }
 
             async function validate(init, segments, tamperIndex) {
-                const response = await fetch('/validate', {
-                    method: 'POST',
-                    headers: { 'content-type': 'application/json' },
-                    body: JSON.stringify({
-                        initialization: toBase64(init.body),
-                        segments: segments.map((s) => toBase64(s.body)),
-                        tamperIndex
-                    })
+                const started = performance.now();
+                const fragments = segments.map((segment, index) => {
+                    if (index !== tamperIndex || segment.body.byteLength <= 100) {
+                        return segment.body;
+                    }
+                    const bytes = new Uint8Array(segment.body.slice(0));
+                    bytes[bytes.length - 100] = (bytes[bytes.length - 100] + 1) % 256;
+                    return bytes;
                 });
-                const result = await response.json();
-                if (!response.ok) {
-                    throw new Error(result.error ?? response.statusText);
+                const reader = await Reader.fromBlobFragment(
+                    state.c2pa,
+                    'video/mp4',
+                    new Blob([init.body], { type: 'video/mp4' }),
+                    new Blob(fragments, { type: 'video/mp4' })
+                );
+                if (reader === null) {
+                    throw new Error('No C2PA manifest was found.');
                 }
-                return result;
+                try {
+                    const report = await reader.manifestStore();
+                    const manifest = report.manifests?.[report.active_manifest];
+                    const statuses = report.validation_results?.activeManifest;
+                    const failureCode = statuses?.failure?.[0]?.code;
+                    return {
+                        state: report.validation_state ?? (failureCode ? 'Invalid' : 'Unknown'),
+                        failureCode,
+                        signer: manifest?.signature_info,
+                        claimGenerator: manifest?.claim_generator,
+                        title: manifest?.title,
+                        statuses,
+                        durationMs: Math.round(performance.now() - started),
+                        report
+                    };
+                } finally {
+                    await reader.free();
+                }
             }
 
             async function validateSingle(segment) {
@@ -569,6 +584,8 @@
             }
 
             async function init() {
+                setStatus('Initializing C2PA Web…');
+                state.c2pa = await createC2pa();
                 $('license').value = localStorage.getItem('c2pa-demo-license') ?? '';
                 const playerConfig = { libraryLocation };
                 if ($('license').value.trim() !== '') {
@@ -588,7 +605,7 @@
                     localStorage.setItem('c2pa-demo-license', $('license').value.trim());
                     setStatus('License saved. Reload the page to apply it.');
                 });
-                setStatus(`Ready. SDK ${THEOplayer.version} from ${libraryLocation}; validation uses the local Node server. Player available as window.player.`);
+                setStatus(`Ready. SDK ${THEOplayer.version} from ${libraryLocation}; C2PA validation runs in this browser with verifyTrust = false. Player available as window.player.`);
             }
 
             init().catch((error) => setStatus(`Initialization failed: ${error.message}`));
