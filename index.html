@@ -259,6 +259,7 @@
                 </label>
                 <label><input id="flag" type="checkbox" checked /> Enable <code>c2paMetadata</code> on the source</label>
                 <label><input id="live" type="checkbox" checked /> Validate every media segment when it arrives</label>
+                <label><input id="verify-trust" type="checkbox" /> Verify signing certificate trust</label>
                 <div>
                     <button id="load">Load &amp; play</button>
                     <button id="validate-all" class="secondary" disabled>Validate all captured segments</button>
@@ -445,7 +446,7 @@
                         'video/mp4',
                         initBlob,
                         new Blob([fragment], { type: 'video/mp4' }),
-                        { verify: { verifyTrust: false } }
+                        { verify: { verifyTrust: $('verify-trust').checked } }
                     );
                     if (reader === null) {
                         throw new Error(`No C2PA manifest was found for media segment ${index + 1}.`);
@@ -613,11 +614,12 @@
                 $('clear').addEventListener('click', clearAll);
                 $('validate-all').addEventListener('click', () => validateAll(false));
                 $('validate-tampered').addEventListener('click', () => validateAll(true));
+                $('verify-trust').addEventListener('change', () => setStatus(`Signing certificate trust verification ${$('verify-trust').checked ? 'enabled' : 'disabled'}.`));
                 $('license').addEventListener('change', () => {
                     localStorage.setItem('c2pa-demo-license', $('license').value.trim());
                     setStatus('License saved. Reload the page to apply it.');
                 });
-                setStatus(`Ready. SDK ${THEOplayer.version} from ${libraryLocation}; C2PA validation runs in this browser with verifyTrust = false. Player available as window.player.`);
+                setStatus(`Ready. SDK ${THEOplayer.version} from ${libraryLocation}; C2PA validation runs in this browser. Player available as window.player.`);
             }
 
             init().catch((error) => setStatus(`Initialization failed: ${error.message}`));
