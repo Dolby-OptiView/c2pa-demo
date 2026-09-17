@@ -231,7 +231,19 @@
             }
         </style>
         <link rel="stylesheet" href="https://cdn.theoplayer.com/dash/theoplayer/ui.css" />
-        <script src="https://cdn.theoplayer.com/dash/theoplayer/THEOplayer.js"></script>
+        <script type="importmap">
+            {
+                "imports": {
+                    "@contentauth/c2pa-web/inline": "https://ga.jspm.io/npm:@contentauth/c2pa-web@0.15.0/dist/inline.js",
+                    "theoplayer": "https://cdn.theoplayer.com/dash/theoplayer/THEOplayer.esm.js"
+                },
+                "scopes": {
+                    "https://ga.jspm.io/": {
+                        "highgain": "https://ga.jspm.io/npm:highgain@0.1.0/dist/index.js"
+                    }
+                }
+            }
+        </script>
     </head>
     <body>
         <header>
@@ -376,7 +388,8 @@
         </main>
 
         <script type="module">
-            import { createC2pa } from 'https://unpkg.com/@contentauth/c2pa-web@0.15.0/dist/inline.js?module';
+            import { createC2pa } from '@contentauth/c2pa-web/inline';
+            import * as THEOplayer from 'theoplayer';
 
             const libraryLocation = 'https://cdn.theoplayer.com/dash/theoplayer/';
             const $ = (id) => document.getElementById(id);

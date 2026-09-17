@@ -25,7 +25,7 @@ The player does not validate C2PA data itself. It exposes the raw metadata and s
 
 Open `index.html` directly or serve it from any static web server, then click **Load & play**.
 
-THEOplayer is loaded from `https://cdn.theoplayer.com/dash/theoplayer/`. `c2pa-web` is loaded from unpkg and performs validation entirely in the browser. If the player build needs a license, paste it into the License field; it is stored in `localStorage`.
+THEOplayer and `c2pa-web` are loaded as ES modules through an import map. Validation runs entirely in the browser. If the player build needs a license, paste it into the License field; it is stored in `localStorage`.
 
 Use **Verify signing certificate trust** to toggle trust-list verification. It is disabled by default because the default stream uses a C2PA test signing certificate. Enabling it causes that stream to report `signingCredential.untrusted` unless the certificate is trusted by the configured C2PA trust policy.
 
