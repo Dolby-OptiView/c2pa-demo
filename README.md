@@ -31,7 +31,7 @@ Use **Verify signing certificate trust** to toggle trust-list verification. It i
 
 ## Default test stream
 
-`https://contentserver.prudentgiraffe.com/videos/hls/c2pa/master.m3u8` is a four-rendition HLS VOD signed with a C2PA test certificate. Each initialization fragment carries the C2PA manifest (`uuid` box, purpose `manifest`), and each media fragment carries Merkle data (`uuid` box, purpose `merkle`).
+`https://cdn.theoplayer.com/video/hls/c2pa/master.m3u8` is a four-rendition HLS VOD signed with a C2PA test certificate. Each initialization fragment carries the C2PA manifest (`uuid` box, purpose `manifest`), and each media fragment carries Merkle data (`uuid` box, purpose `merkle`).
 
 Any other fMP4/CMAF HLS or DASH stream can be used. Streams without C2PA data produce no `c2pametadata` events and cannot be validated by the demo.
 
