@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Dolby OptiView Player — C2PA metadata &amp; validation demo</title>
+        <style>
+            :root {
+                color-scheme: dark;
+                font-family: 'Avenir Next', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+                font-size: 14px;
+                --bg: #14141a;
+                --panel: #1c1c23;
+                --panel-2: #23232b;
+                --border: #2c2c31;
+                --text: #ffffff;
+                --text-2: #b9b9ba;
+                --purple: #aa33ff;
+                --purple-2: #b924ff;
+                --blue: #35c8ff;
+                --pink: #ff2e7e;
+                --green: #00eb81;
+            }
+            body {
+                margin: 0;
+                background: var(--bg);
+                color: var(--text);
+            }
+            header {
+                padding: 16px 24px 14px;
+                border-bottom: 1px solid var(--border);
+                background: linear-gradient(90deg, rgba(170, 51, 255, 0.14), rgba(53, 200, 255, 0.06) 60%, transparent);
+            }
+            .brand {
+                display: flex;
+                align-items: baseline;
+                gap: 10px;
+                margin-bottom: 4px;
+            }
+            .brand .wordmark {
+                font-weight: 700;
+                font-size: 13px;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+            }
+            .brand .wordmark span {
+                color: var(--purple);
+            }
+            .brand .formerly {
+                color: var(--text-2);
+                font-size: 12px;
+            }
+            header h1 {
+                margin: 0;
+                font-size: 20px;
+                font-weight: 600;
+            }
+            header p {
+                margin: 6px 0 0;
+                max-width: 1100px;
+                color: var(--text-2);
+            }
+            header strong {
+                color: var(--text);
+            }
+            main {
+                display: grid;
+                grid-template-columns: minmax(420px, 1fr) minmax(420px, 1fr);
+                gap: 16px;
+                padding: 16px 24px 24px;
+            }
+            section {
+                background: var(--panel);
+                border: 1px solid var(--border);
+                border-radius: 12px;
+                padding: 16px 18px;
+            }
+            section h2 {
+                margin: 0 0 10px;
+                font-size: 15px;
+                font-weight: 600;
+            }
+            label {
+                display: block;
+                margin: 6px 0;
+                color: var(--text-2);
+            }
+            input[type='text'] {
+                width: 100%;
+                box-sizing: border-box;
+                margin-top: 3px;
+                padding: 7px 10px;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                background: var(--bg);
+                color: var(--text);
+                font-family: ui-monospace, monospace;
+            }
+            input[type='text']:focus {
+                outline: none;
+                border-color: var(--purple);
+            }
+            input[type='checkbox'] {
+                accent-color: var(--purple);
+            }
+            button {
+                padding: 7px 16px;
+                border: 1px solid var(--purple);
+                background: var(--purple);
+                color: #fff;
+                border-radius: 999px;
+                font: inherit;
+                font-size: 13px;
+                cursor: pointer;
+                margin: 4px 6px 4px 0;
+            }
+            button:hover:not(:disabled) {
+                filter: brightness(1.12);
+            }
+            button.secondary {
+                background: transparent;
+                border-color: var(--text-2);
+                color: var(--text);
+            }
+            button.secondary:hover:not(:disabled) {
+                border-color: var(--purple);
+                filter: none;
+            }
+            button:disabled {
+                opacity: 0.4;
+                cursor: default;
+            }
+            .full {
+                grid-column: 1 / -1;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 12.5px;
+            }
+            th,
+            td {
+                text-align: left;
+                padding: 5px 6px;
+                border-bottom: 1px solid var(--border);
+                vertical-align: top;
+            }
+            th {
+                background: var(--panel-2);
+                color: var(--text-2);
+                font-weight: 600;
+                position: sticky;
+                top: 0;
+            }
+            .scroll {
+                max-height: 320px;
+                overflow: auto;
+            }
+            code,
+            .mono {
+                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                font-size: 12px;
+            }
+            .badge {
+                display: inline-block;
+                padding: 2px 8px;
+                border-radius: 10px;
+                font-weight: 600;
+                font-size: 12px;
+            }
+            .valid {
+                background: rgba(0, 235, 129, 0.16);
+                color: var(--green);
+            }
+            .invalid {
+                background: rgba(255, 46, 126, 0.16);
+                color: var(--pink);
+            }
+            .pending {
+                background: var(--panel-2);
+                color: var(--text-2);
+            }
+            .unknown {
+                background: rgba(53, 200, 255, 0.16);
+                color: var(--blue);
+            }
+            #result-state {
+                font-size: 22px;
+                padding: 6px 16px;
+            }
+            pre {
+                background: var(--bg);
+                border: 1px solid var(--border);
+                padding: 8px;
+                border-radius: 8px;
+                overflow: auto;
+                max-height: 360px;
+                font-size: 11.5px;
+            }
+            summary {
+                color: var(--text-2);
+                cursor: pointer;
+            }
+            .muted {
+                color: var(--text-2);
+            }
+            .stats span {
+                margin-right: 16px;
+            }
+            #status {
+                font-size: 12.5px;
+                color: var(--text-2);
+                margin-top: 6px;
+            }
+            #player {
+                border-radius: 8px;
+                overflow: hidden;
+            }
+            /* Skin primary color (the SDK UI defaults to yellow). Must come after ui.css, hence the !important. */
+            .theoplayer-skin .theo-primary-color,
+            .theoplayer-skin .vjs-big-play-button {
+                color: var(--purple-2) !important;
+            }
+            .theoplayer-skin .theo-primary-background,
+            .theoplayer-skin .vjs-play-progress {
+                background-color: var(--purple-2) !important;
+            }
+            .theoplayer-skin .theo-primary-border,
+            .theoplayer-skin .vjs-big-play-button {
+                border-color: var(--purple-2) !important;
+            }
+        </style>
+        <link id="ui-css" rel="stylesheet" />
+    </head>
+    <body>
+        <header>
+            <div class="brand">
+                <div class="wordmark">Dolby <span>OptiView</span> Player</div>
+                <div class="formerly">formerly THEOplayer</div>
+            </div>
+            <h1>C2PA content provenance — metadata &amp; validation demo</h1>
+            <p>
+                The OptiView Player exposes the raw C2PA metadata of a signed stream through <code>c2pametadata</code> events (source flag
+                <code>c2paMetadata: true</code>). This page captures the segment bytes with the network API and validates them with
+                <strong>c2patool</strong> (the C2PA reference implementation) in the local Node server. The player itself never validates
+                anything.
+            </p>
+        </header>
+        <main>
+            <section>
+                <h2>Player</h2>
+                <label>
+                    Stream URL (HLS or DASH, fMP4/CMAF)
+                    <input id="src" type="text" value="https://contentserver.prudentgiraffe.com/videos/hls/c2pa/master.m3u8" />
+                </label>
+                <label>
+                    License (optional, only needed for a licensed Web SDK build)
+                    <input id="license" type="text" placeholder="leave empty for a build that does not need a license" />
+                </label>
+                <label><input id="flag" type="checkbox" checked /> Enable <code>c2paMetadata</code> on the source</label>
+                <label><input id="live" type="checkbox" checked /> Validate every media segment when it arrives</label>
+                <div>
+                    <button id="load">Load &amp; play</button>
+                    <button id="validate-all" class="secondary" disabled>Validate all captured segments</button>
+                    <button id="validate-tampered" class="secondary" disabled>Validate with one tampered segment (MITM)</button>
+                    <button id="clear" class="secondary">Clear</button>
+                </div>
+                <div id="status" class="muted">Loading configuration…</div>
+                <div style="margin-top: 10px">
+                    <div id="player" class="video-js theoplayer-skin vjs-16-9"></div>
+                </div>
+            </section>
+
+            <section>
+                <h2>Validation result (c2patool)</h2>
+                <div><span id="result-state" class="badge pending">no validation yet</span></div>
+                <table style="margin-top: 10px">
+                    <tr>
+                        <th style="width: 160px">Signer (issuer)</th>
+                        <td id="r-issuer" class="mono">–</td>
+                    </tr>
+                    <tr>
+                        <th>Common name</th>
+                        <td id="r-cn" class="mono">–</td>
+                    </tr>
+                    <tr>
+                        <th>Claim generator</th>
+                        <td id="r-gen" class="mono">–</td>
+                    </tr>
+                    <tr>
+                        <th>Title</th>
+                        <td id="r-title" class="mono">–</td>
+                    </tr>
+                    <tr>
+                        <th>Failure code</th>
+                        <td id="r-failure" class="mono">–</td>
+                    </tr>
+                    <tr>
+                        <th>Validated input</th>
+                        <td id="r-input" class="mono">–</td>
+                    </tr>
+                    <tr>
+                        <th>c2patool time</th>
+                        <td id="r-time" class="mono">–</td>
+                    </tr>
+                </table>
+                <h2 style="margin-top: 14px">Validation statuses</h2>
+                <div class="scroll" style="max-height: 200px">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Kind</th>
+                                <th>Code</th>
+                                <th>Explanation</th>
+                            </tr>
+                        </thead>
+                        <tbody id="statuses"></tbody>
+                    </table>
+                </div>
+                <details style="margin-top: 10px">
+                    <summary>Raw c2patool report</summary>
+                    <pre id="raw">–</pre>
+                </details>
+            </section>
+
+            <section>
+                <h2>
+                    <code>c2pametadata</code> events from the player
+                    <span class="muted stats" style="font-weight: normal; margin-left: 10px">
+                        <span>init/manifest: <b id="n-init">0</b></span>
+                        <span>media/merkle: <b id="n-media">0</b></span>
+                    </span>
+                </h2>
+                <div class="scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>purpose</th>
+                                <th>segmentType</th>
+                                <th>mediaType</th>
+                                <th>start – end (s)</th>
+                                <th>bytes</th>
+                                <th>data (first bytes)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="events"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section>
+                <h2>
+                    Captured segments (network response interceptor)
+                    <span class="muted stats" style="font-weight: normal; margin-left: 10px">
+                        <span>init: <b id="n-cap-init">0</b></span>
+                        <span>media: <b id="n-cap-media">0</b></span>
+                    </span>
+                </h2>
+                <div class="scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>type</th>
+                                <th>URL</th>
+                                <th>bytes</th>
+                                <th>per-segment validation</th>
+                            </tr>
+                        </thead>
+                        <tbody id="segments"></tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+
+        <script>
+            const $ = (id) => document.getElementById(id);
+            const state = {
+                player: undefined,
+                events: [],
+                // Initialization segments keyed by "track key" (URL directory), media segments in arrival order.
+                inits: new Map(),
+                segments: [],
+                pendingLive: []
+            };
+
+            function trackKeyOf(url) {
+                return url.replace(/\?.*$/, '').replace(/\/[^/]*$/, '/');
+            }
+
+            function toBase64(buffer) {
+                const view = new Uint8Array(buffer);
+                let binary = '';
+                for (let i = 0; i < view.length; i += 0x8000) {
+                    binary += String.fromCharCode.apply(null, view.subarray(i, i + 0x8000));
+                }
+                return btoa(binary);
+            }
+
+            function hexPreview(data, count = 16) {
+                return Array.from(data.subarray(0, count))
+                    .map((b) => b.toString(16).padStart(2, '0'))
+                    .join(' ') + (data.byteLength > count ? ' …' : '');
+            }
+
+            function setStatus(text) {
+                $('status').textContent = text;
+            }
+
+            function badge(el, stateText) {
+                el.textContent = stateText;
+                el.className = 'badge ' + (stateText === 'Valid' ? 'valid' : stateText === 'Invalid' ? 'invalid' : stateText === 'pending' ? 'pending' : 'unknown');
+            }
+
+            function showResult(result, inputDescription) {
+                badge($('result-state'), result.state);
+                $('r-issuer').textContent = result.signer?.issuer ?? '–';
+                $('r-cn').textContent = result.signer?.common_name ?? '–';
+                $('r-gen').textContent = result.claimGenerator ?? '–';
+                $('r-title').textContent = result.title ?? '–';
+                $('r-failure').textContent = result.failureCode ?? (result.state === 'Valid' ? 'none' : '–');
+                $('r-input').textContent = inputDescription;
+                $('r-time').textContent = `${result.durationMs} ms`;
+                const rows = [];
+                for (const kind of ['failure', 'informational', 'success']) {
+                    for (const s of result.statuses?.[kind] ?? []) {
+                        rows.push(`<tr><td>${kind}</td><td class="mono">${s.code}</td><td>${s.explanation ?? ''}</td></tr>`);
+                    }
+                }
+                if (rows.length === 0 && result.failureCode) {
+                    rows.push(`<tr><td>failure</td><td class="mono">${result.failureCode}</td><td>${result.stderr}</td></tr>`);
+                }
+                $('statuses').innerHTML = rows.join('') || '<tr><td colspan="3" class="muted">no statuses</td></tr>';
+                $('raw').textContent = result.report ? JSON.stringify(result.report, null, 2) : result.stderr || '(no report)';
+            }
+
+            async function validate(init, segments, tamperIndex) {
+                const response = await fetch('/validate', {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({
+                        initialization: toBase64(init.body),
+                        segments: segments.map((s) => toBase64(s.body)),
+                        tamperIndex
+                    })
+                });
+                const result = await response.json();
+                if (!response.ok) {
+                    throw new Error(result.error ?? response.statusText);
+                }
+                return result;
+            }
+
+            async function validateSingle(segment) {
+                const init = state.inits.get(segment.trackKey);
+                if (init === undefined) {
+                    state.pendingLive.push(segment);
+                    return;
+                }
+                const cell = $(`seg-${segment.index}`);
+                cell.innerHTML = '<span class="badge pending">validating…</span>';
+                try {
+                    const result = await validate(init, [segment]);
+                    cell.innerHTML = `<span class="badge ${result.state === 'Valid' ? 'valid' : 'invalid'}">${result.state}</span> <span class="muted">${result.failureCode ?? ''} ${result.durationMs} ms</span>`;
+                } catch (error) {
+                    cell.innerHTML = `<span class="badge unknown">error</span> <span class="muted">${error.message}</span>`;
+                }
+            }
+
+            async function validateAll(tamper) {
+                // Validate per track (a rendition switch gives a second init segment with its own media segments).
+                const tracks = [...state.inits.keys()].filter((key) => state.segments.some((s) => s.trackKey === key));
+                if (tracks.length === 0) {
+                    setStatus('Nothing captured yet.');
+                    return;
+                }
+                $('validate-all').disabled = $('validate-tampered').disabled = true;
+                const summary = [];
+                try {
+                    for (const key of tracks) {
+                        const init = state.inits.get(key);
+                        const segments = state.segments.filter((s) => s.trackKey === key);
+                        const tamperIndex = tamper ? Math.floor(segments.length / 2) : undefined;
+                        badge($('result-state'), 'pending');
+                        setStatus(`Validating ${segments.length} segment(s) of ${key}${tamper ? ` with segment #${tamperIndex} tampered (one byte changed)` : ''}…`);
+                        const result = await validate(init, segments, tamperIndex);
+                        showResult(
+                            result,
+                            `${key} — init (${init.body.byteLength} B) + ${segments.length} media segment(s)${tamper ? `, segment #${tamperIndex} tampered` : ''}`
+                        );
+                        summary.push(`${key.replace(/^https?:\/\/[^/]+/, '')} → ${result.state}`);
+                    }
+                    setStatus(`Validation done. ${summary.join(' | ')}${tracks.length > 1 ? ' (result panel shows the last track)' : ''}`);
+                } catch (error) {
+                    setStatus(`Validation error: ${error.message}`);
+                } finally {
+                    $('validate-all').disabled = $('validate-tampered').disabled = false;
+                }
+            }
+
+            function onC2PAMetadata(event) {
+                const index = state.events.push(event);
+                const row = document.createElement('tr');
+                const time = event.startTime === undefined ? '–' : `${event.startTime.toFixed(3)} – ${event.endTime.toFixed(3)}`;
+                row.innerHTML = `<td>${index}</td><td class="mono">${event.purpose}</td><td>${event.segmentType}</td><td>${event.mediaType}</td><td class="mono">${time}</td><td>${event.data.byteLength}</td><td class="mono">${hexPreview(event.data)}</td>`;
+                $('events').appendChild(row);
+                $('n-init').textContent = state.events.filter((e) => e.segmentType === 'initialization').length;
+                $('n-media').textContent = state.events.filter((e) => e.segmentType === 'media').length;
+            }
+
+            function onSegmentResponse(response) {
+                if (!(response.body instanceof ArrayBuffer)) {
+                    return;
+                }
+                const isInit = response.request.type === 'initialization-segment' || /init/i.test(response.url);
+                const isSegment = response.request.type === 'segment' || /\.(m4s|mp4|m4v|m4a|cmfv|cmfa)(\?|$)/i.test(response.url);
+                if (!isInit && !isSegment) {
+                    return;
+                }
+                const entry = { index: state.segments.length + state.inits.size + 1, url: response.url, body: response.body, trackKey: trackKeyOf(response.url) };
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${entry.index}</td><td>${isInit ? 'init' : 'media'}</td><td class="mono">${response.url.replace(/^https?:\/\/[^/]+/, '')}</td><td>${response.body.byteLength}</td><td id="seg-${entry.index}" class="muted">${isInit ? '(init: validated together with media)' : '–'}</td>`;
+                $('segments').appendChild(row);
+                if (isInit) {
+                    if (!state.inits.has(entry.trackKey)) {
+                        state.inits.set(entry.trackKey, entry);
+                    }
+                    const waiting = state.pendingLive.filter((s) => s.trackKey === entry.trackKey);
+                    state.pendingLive = state.pendingLive.filter((s) => s.trackKey !== entry.trackKey);
+                    waiting.forEach(validateSingle);
+                } else {
+                    state.segments.push(entry);
+                    if ($('live').checked) {
+                        validateSingle(entry);
+                    }
+                }
+                $('n-cap-init').textContent = state.inits.size;
+                $('n-cap-media').textContent = state.segments.length;
+                $('validate-all').disabled = $('validate-tampered').disabled = state.segments.length === 0;
+            }
+
+            function clearAll() {
+                state.events = [];
+                state.inits = new Map();
+                state.segments = [];
+                state.pendingLive = [];
+                for (const id of ['events', 'segments', 'statuses']) {
+                    $(id).innerHTML = '';
+                }
+                for (const id of ['n-init', 'n-media', 'n-cap-init', 'n-cap-media']) {
+                    $(id).textContent = '0';
+                }
+                badge($('result-state'), 'no validation yet');
+                for (const id of ['r-issuer', 'r-cn', 'r-gen', 'r-title', 'r-failure', 'r-input', 'r-time', 'raw']) {
+                    $(id).textContent = '–';
+                }
+                $('validate-all').disabled = $('validate-tampered').disabled = true;
+            }
+
+            function load() {
+                clearAll();
+                const flag = $('flag').checked;
+                state.player.source = { sources: [{ src: $('src').value.trim(), c2paMetadata: flag }] };
+                state.player.play();
+                setStatus(`Playing with c2paMetadata: ${flag}. ${flag ? 'Waiting for c2pametadata events…' : 'No c2pametadata events are expected with the flag off.'}`);
+            }
+
+            async function init() {
+                const config = await (await fetch('/config.json')).json();
+                $('ui-css').href = config.libraryLocation + 'ui.css';
+                await new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = config.libraryLocation + 'THEOplayer.js';
+                    script.onload = resolve;
+                    script.onerror = () => reject(new Error(`Could not load ${script.src}`));
+                    document.head.appendChild(script);
+                });
+                $('license').value = localStorage.getItem('c2pa-demo-license') ?? '';
+                const playerConfig = { libraryLocation: config.libraryLocation };
+                if ($('license').value.trim() !== '') {
+                    playerConfig.license = $('license').value.trim();
+                }
+                state.player = new THEOplayer.Player($('player'), playerConfig);
+                window.player = state.player;
+                state.player.addEventListener('c2pametadata', onC2PAMetadata);
+                state.player.addEventListener('error', (event) => setStatus(`Player error: ${event.errorObject?.message ?? event.error}`));
+                state.player.network.addResponseInterceptor(onSegmentResponse);
+
+                $('load').addEventListener('click', load);
+                $('clear').addEventListener('click', clearAll);
+                $('validate-all').addEventListener('click', () => validateAll(false));
+                $('validate-tampered').addEventListener('click', () => validateAll(true));
+                $('license').addEventListener('change', () => {
+                    localStorage.setItem('c2pa-demo-license', $('license').value.trim());
+                    setStatus('License saved. Reload the page to apply it.');
+                });
+                setStatus(
+                    `Ready. SDK ${THEOplayer.version} from ${config.libraryLocation}; ${config.c2patool ?? 'c2patool NOT FOUND (validation will fail)'}; verify_trust = ${config.verifyTrust}. Player available as window.player.`
+                );
+            }
+
+            init().catch((error) => setStatus(`Initialization failed: ${error.message}`));
+        </script>
+    </body>
+</html>
