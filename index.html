@@ -375,7 +375,7 @@
         </main>
 
         <script type="module">
-            import { Reader, createC2pa } from 'https://unpkg.com/@contentauth/c2pa-web@0.15.0/dist/inline.js?module';
+            import { createC2pa } from 'https://unpkg.com/@contentauth/c2pa-web@0.15.0/dist/inline.js?module';
 
             const libraryLocation = 'https://cdn.theoplayer.com/dash/theoplayer/';
             const $ = (id) => document.getElementById(id);
@@ -432,41 +432,53 @@
 
             async function validate(init, segments, tamperIndex) {
                 const started = performance.now();
-                const fragments = segments.map((segment, index) => {
-                    if (index !== tamperIndex || segment.body.byteLength <= 100) {
-                        return segment.body;
+                const initBlob = new Blob([init.body], { type: 'video/mp4' });
+                const reports = [];
+                for (const [index, segment] of segments.entries()) {
+                    let fragment = segment.body;
+                    if (index === tamperIndex && fragment.byteLength > 100) {
+                        const bytes = new Uint8Array(fragment.slice(0));
+                        bytes[bytes.length - 100] = (bytes[bytes.length - 100] + 1) % 256;
+                        fragment = bytes;
                     }
-                    const bytes = new Uint8Array(segment.body.slice(0));
-                    bytes[bytes.length - 100] = (bytes[bytes.length - 100] + 1) % 256;
-                    return bytes;
-                });
-                const reader = await Reader.fromBlobFragment(
-                    state.c2pa,
-                    'video/mp4',
-                    new Blob([init.body], { type: 'video/mp4' }),
-                    new Blob(fragments, { type: 'video/mp4' })
-                );
-                if (reader === null) {
-                    throw new Error('No C2PA manifest was found.');
+                    const reader = await state.c2pa.reader.fromBlobFragment(
+                        'video/mp4',
+                        initBlob,
+                        new Blob([fragment], { type: 'video/mp4' }),
+                        { verify: { verifyTrust: false } }
+                    );
+                    if (reader === null) {
+                        throw new Error(`No C2PA manifest was found for media segment ${index + 1}.`);
+                    }
+                    try {
+                        reports.push(await reader.manifestStore());
+                    } finally {
+                        await reader.free();
+                    }
                 }
-                try {
-                    const report = await reader.manifestStore();
-                    const manifest = report.manifests?.[report.active_manifest];
-                    const statuses = report.validation_results?.activeManifest;
-                    const failureCode = statuses?.failure?.[0]?.code;
-                    return {
-                        state: report.validation_state ?? (failureCode ? 'Invalid' : 'Unknown'),
-                        failureCode,
-                        signer: manifest?.signature_info,
-                        claimGenerator: manifest?.claim_generator,
-                        title: manifest?.title,
-                        statuses,
-                        durationMs: Math.round(performance.now() - started),
-                        report
-                    };
-                } finally {
-                    await reader.free();
+                const report = reports.find((item) => item.validation_state === 'Invalid') ?? reports.at(-1);
+                const manifest = report.manifests?.[report.active_manifest];
+                const statuses = { failure: [], informational: [], success: [] };
+                for (const item of reports) {
+                    for (const kind of Object.keys(statuses)) {
+                        for (const status of item.validation_results?.activeManifest?.[kind] ?? []) {
+                            if (!statuses[kind].some((candidate) => candidate.code === status.code && candidate.url === status.url)) {
+                                statuses[kind].push(status);
+                            }
+                        }
+                    }
                 }
+                const failureCode = statuses.failure[0]?.code;
+                return {
+                    state: reports.some((item) => item.validation_state === 'Invalid') ? 'Invalid' : reports.every((item) => item.validation_state === 'Valid') ? 'Valid' : 'Unknown',
+                    failureCode,
+                    signer: manifest?.signature_info,
+                    claimGenerator: manifest?.claim_generator,
+                    title: manifest?.title,
+                    statuses,
+                    durationMs: Math.round(performance.now() - started),
+                    report
+                };
             }
 
             async function validateSingle(segment) {
