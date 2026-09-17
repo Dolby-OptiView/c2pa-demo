@@ -230,7 +230,8 @@
                 border-color: var(--purple-2) !important;
             }
         </style>
-        <link id="ui-css" rel="stylesheet" />
+        <link rel="stylesheet" href="https://cdn.theoplayer.com/dash/theoplayer/ui.css" />
+        <script src="https://cdn.theoplayer.com/dash/theoplayer/THEOplayer.js"></script>
     </head>
     <body>
         <header>
@@ -265,7 +266,7 @@
                     <button id="validate-tampered" class="secondary" disabled>Validate with one tampered segment (MITM)</button>
                     <button id="clear" class="secondary">Clear</button>
                 </div>
-                <div id="status" class="muted">Loading configuration…</div>
+                <div id="status" class="muted">Initializing…</div>
                 <div style="margin-top: 10px">
                     <div id="player" class="video-js theoplayer-skin vjs-16-9"></div>
                 </div>
@@ -375,6 +376,7 @@
         </main>
 
         <script>
+            const libraryLocation = 'https://cdn.theoplayer.com/dash/theoplayer/';
             const $ = (id) => document.getElementById(id);
             const state = {
                 player: undefined,
@@ -567,17 +569,8 @@
             }
 
             async function init() {
-                const config = await (await fetch('/config.json')).json();
-                $('ui-css').href = config.libraryLocation + 'ui.css';
-                await new Promise((resolve, reject) => {
-                    const script = document.createElement('script');
-                    script.src = config.libraryLocation + 'THEOplayer.js';
-                    script.onload = resolve;
-                    script.onerror = () => reject(new Error(`Could not load ${script.src}`));
-                    document.head.appendChild(script);
-                });
                 $('license').value = localStorage.getItem('c2pa-demo-license') ?? '';
-                const playerConfig = { libraryLocation: config.libraryLocation };
+                const playerConfig = { libraryLocation };
                 if ($('license').value.trim() !== '') {
                     playerConfig.license = $('license').value.trim();
                 }
@@ -595,9 +588,7 @@
                     localStorage.setItem('c2pa-demo-license', $('license').value.trim());
                     setStatus('License saved. Reload the page to apply it.');
                 });
-                setStatus(
-                    `Ready. SDK ${THEOplayer.version} from ${config.libraryLocation}; ${config.c2patool ?? 'c2patool NOT FOUND (validation will fail)'}; verify_trust = ${config.verifyTrust}. Player available as window.player.`
-                );
+                setStatus(`Ready. SDK ${THEOplayer.version} from ${libraryLocation}; validation uses the local Node server. Player available as window.player.`);
             }
 
             init().catch((error) => setStatus(`Initialization failed: ${error.message}`));
